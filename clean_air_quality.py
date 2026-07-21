@@ -234,6 +234,9 @@ def main():
     parser.add_argument("--bucket", help="Nom du bucket S3 (si --source s3)")
     parser.add_argument("--prefix", default="RAW/", help="Préfixe S3 (si --source s3)")
     parser.add_argument("--output", default="./clean_data/air_quality_clean.csv")
+    parser.add_argument("--upload-s3-key", default=None,
+                         help="Si fourni (ex: 'CLEAN/air_quality_clean.csv'), upload le résultat vers ce "
+                              "chemin dans le bucket --bucket après nettoyage.")
     args = parser.parse_args()
 
     if args.raw_format == "csv":
@@ -267,7 +270,15 @@ def main():
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     df_clean.to_csv(args.output, index=False)
-    print(f"[OK] Fichier propre sauvegardé : {args.output}")
+    print(f"[OK] Fichier propre sauvegardé localement : {args.output}")
+
+    if args.upload_s3_key:
+        if not args.bucket:
+            raise SystemExit("--bucket est requis pour utiliser --upload-s3-key")
+        import boto3
+        s3 = boto3.client("s3")
+        s3.upload_file(args.output, args.bucket, args.upload_s3_key)
+        print(f"[OK] Fichier uploadé vers s3://{args.bucket}/{args.upload_s3_key}")
 
 
 if __name__ == "__main__":
