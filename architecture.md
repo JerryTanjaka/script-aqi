@@ -6,16 +6,6 @@ On récupère automatiquement, toutes les heures, la qualité de l'air de
 5 villes de Madagascar, on nettoie ces données, et on les stocke pour
 pouvoir ensuite les analyser et les visualiser.
 
-## Les 5 villes suivies
-
-| Ville | Latitude | Longitude |
-|---|---|---|
-| Antananarivo | -18.9185 | 47.5211 |
-| Toliara | -23.3583 | 43.6672 |
-| Toamasina | -18.1716 | 49.3761 |
-| Mahajanga | -15.7180 | 46.3173 |
-| Antsiranana | -12.2783 | 49.2915 |
-
 ---
 
 ## Le pipeline en 4 étapes
