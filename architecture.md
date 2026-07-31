@@ -21,15 +21,18 @@ pouvoir ensuite les analyser et les visualiser.
 ## Le pipeline en 4 étapes
 
 ```
-1. RÉCUPÉRER            2. STOCKER (brut)        3. NETTOYER            4. STOCKER (propre)
-   API météo        -->    AWS S3 - RAW/     -->    Script Python   -->    AWS S3 - CLEAN/
-   (n8n, toutes                                      (pandas)
-    les heures)
+1. RÉCUPÉRER            2. STOCKER (brut)        3. NETTOYER            4. CHARGER
+   API météo        -->    AWS S3 - RAW/     -->    Script Python   -->    Data warehouse
+   (n8n, toutes                                      (sans pandas)
+    les heures)                         CSV propre --> AWS S3 - CLEAN/
 ```
 
-Ensuite, ces données propres sont chargées dans un **data warehouse**
-(une base de données organisée), pour que chacun puisse construire ses
-propres graphiques dessus (Bloc 2, travail individuel).
+Les données sont d'abord récupérées depuis l'API météo et conservées telles
+quelles dans `RAW/`. Un script Python les nettoie ensuite sans utiliser
+`pandas`, puis enregistre la version propre au format CSV dans `CLEAN/`.
+Enfin, les données propres sont chargées ou mises à jour dans le **data
+warehouse** (une base de données organisée), pour que chacun puisse
+construire ses propres graphiques dessus (Bloc 2, travail individuel).
 
 ---
 
@@ -67,9 +70,9 @@ Python.
 
 ## Étape 3 — Nettoyer les données (script Python)
 
-**Outil : script Python** (`clean_air_quality.py`, avec la librairie
-pandas), lancé automatiquement juste après la récupération, directement
-depuis n8n (node "Execute Command" sur le VPS).
+**Outil : script Python** (`clean_air_quality.py`, sans pandas), lancé
+automatiquement juste après la récupération, directement depuis n8n (node
+"Execute Command" sur le VPS).
 
 Le script fait le ménage dans les données brutes :
 - il enlève les doublons (si la même mesure arrive deux fois)
@@ -77,25 +80,26 @@ Le script fait le ménage dans les données brutes :
 - il transforme les dates illisibles (ex: `1753779600`) en dates
   normales (ex: `29 juillet 2025, 09h00`)
 - il retrouve le nom de la ville à partir de ses coordonnées GPS
-- il range tout ça proprement dans un nouveau fichier JSON
+- il range tout ça proprement dans un nouveau fichier CSV
 
-Ce fichier propre est ensuite déposé dans un second dossier, `CLEAN/`
-(= "propre"), toujours sur S3.
+Ce fichier CSV propre est ensuite déposé dans un second dossier, `CLEAN/`
+(= "propre"), toujours sur S3, puis utilisé pour mettre à jour le data
+warehouse.
 
 **Pourquoi un script à part, plutôt que tout faire dans n8n ?**
 Parce que nettoyer une grosse quantité de données (jusqu'à 12 mois
-d'historique x 5 villes, soit plus de 40 000 mesures) est bien plus
-simple et rapide avec Python/pandas qu'avec les outils de n8n, qui sont
-plutôt faits pour des tâches simples.
+d'historique x 5 villes, soit plus de 40 000 mesures) est plus simple avec
+un script Python dédié qu'avec les outils de n8n, qui sont plutôt faits pour
+des tâches d'orchestration et des transformations simples.
 
-**Pourquoi le script sort du JSON, et pas du CSV ?**
-Parce que l'API nous donne déjà du JSON — pas besoin de le transformer
-en CSV puis de le reconvertir en JSON après, ça ferait une étape
-inutile qui ralentit tout, surtout avec beaucoup de données.
+**Pourquoi le script sort du CSV ?**
+Le JSON reçu de l'API est conservé tel quel dans `RAW/` afin de garder une
+copie fidèle des données originales. Après nettoyage, le CSV est plus
+adapté au chargement dans le data warehouse et à l'analyse tabulaire.
 
 ---
 
-## Étape 4 — Charger dans le data warehouse (à finaliser)
+## Étape 4 — Mettre à jour le data warehouse
 
 Un **data warehouse**, c'est une base de données bien rangée, organisée
 en tables, pensée pour qu'on puisse poser des questions dessus
@@ -104,8 +108,10 @@ facilement (ex : "quelle est la ville la plus polluée en moyenne ?").
 C'est différent du data lake (S3) qui, lui, stocke juste des fichiers
 en vrac.
 
-*[Cette section sera complétée une fois l'outil choisi par le groupe :
-PostgreSQL, BigQuery, Snowflake ou Redshift]*
+Les fichiers CSV propres déposés dans `CLEAN/` sont ensuite chargés dans le
+data warehouse. Le chargement met à jour les données existantes et ajoute
+les nouvelles mesures, afin de conserver une table exploitable pour les
+analyses et les visualisations.
 
 Les tables seront organisées en **modélisation en étoile** : une table
 centrale avec les mesures (ville, date, polluants), reliée à des petites
