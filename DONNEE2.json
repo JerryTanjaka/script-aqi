@@ -1,0 +1,409 @@
+{
+  "name": "DONNEE2",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 12
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -288,
+        0
+      ],
+      "id": "90ef9795-ff15-4a17-bc8b-de2db4a84a56",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "=data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1856,
+        96
+      ],
+      "id": "567ded96-4e41-4d66-b7d8-d525f09d011e",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "url": "https://weather.yotech.mg/air-quality?lat=-23.3583&lon=43.6672&months=12",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        176,
+        -448
+      ],
+      "id": "b593af4e-5837-4e11-96f0-3923b189888f",
+      "name": "Tulear Data"
+    },
+    {
+      "parameters": {
+        "url": "https://weather.yotech.mg/air-quality?lat=-18.9185&lon=47.5211&months=12",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        160,
+        -624
+      ],
+      "id": "a5ecd378-db41-4056-893c-235db5046018",
+      "name": "Antananarivo Data"
+    },
+    {
+      "parameters": {
+        "url": "https://weather.yotech.mg/air-quality?lat=-18.1716&lon=49.3761&months=12",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        144,
+        -256
+      ],
+      "id": "8ecf5805-3ac1-4c83-b8a4-7fb2ba6e0bd4",
+      "name": "Toamasina Data",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "url": "https://weather.yotech.mg/air-quality?lat=-15.7180&lon=46.3173&months=12",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        160,
+        -32
+      ],
+      "id": "1b7b9e2b-b3aa-4153-bca7-d8a6fdd0af4f",
+      "name": "Mahajanga Data"
+    },
+    {
+      "parameters": {
+        "url": "https://weather.yotech.mg/air-quality?lat=-12.2783&lon=49.2915&months=12",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        160,
+        192
+      ],
+      "id": "8b46036c-833d-4b36-8df7-2abf3136d728",
+      "name": "Antsiranana Data"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "\"\"\"\nNode \"Code in Python\" - n8n\nEtape RAW -> CLEAN du pipeline \"Qualite de l'air\" (workflow DONNEE2)\n\nA coller tel quel dans le node \"Code in Python\", en mode \"Run Once for All Items\".\n\nCORRECTIFS (v3) par rapport aux versions precedentes :\n1. Timestamp reconstruit par interpolation (period.start/end/nb_points) quand\n   aucun \"dt\"/\"timestamp\"/\"time\" explicite n'est fourni par l'entree.\n2. Detection automatique du mode d'input runner : \"_items\" (Pyodide) ou\n   \"_input.all()\" (runner natif), sans intervention manuelle.\n3. NOUVEAU : gere le cas ou un node \"Aggregate\" en amont a regroupe plusieurs\n   villes dans UN SEUL item n8n, sous la forme {\"data\": [ville1, ville2, ...]}.\n   Avant ce correctif, le script traitait ce tableau de villes comme un\n   tableau de MESURES d'une seule ville -> aucune ligne ne matchait \"aqi\"/\n   composants -> sortie vide (\"No output data returned\").\n   Le script detecte maintenant automatiquement si \"data\" contient des objets\n   \"ville\" (avec \"period\"/\"coord\"/\"lat\") ou des objets \"mesure\" (avec \"main\"/\n   \"components\"), et s'adapte sans configuration supplementaire.\n\nOutput : une liste d'items n8n ([{\"json\": {...}}, ...]) prete pour \"Convert to File\".\n\"\"\"\n\nfrom datetime import datetime, timedelta, timezone\n\n# ----------------------------------------------------------------------\n# 1. Table de correspondance lat/lon -> ville\n# ----------------------------------------------------------------------\nCITY_LOOKUP = {\n    (-18.9185, 47.5211): \"Antananarivo\",\n    (-23.3583, 43.6672): \"Toliara\",\n    (-18.1716, 49.3761): \"Toamasina\",\n    (-15.7180, 46.3173): \"Mahajanga\",\n    (-12.2783, 49.2915): \"Antsiranana\",\n}\n\nPOLLUTANT_COLUMNS = [\"co\", \"no\", \"no2\", \"o3\", \"so2\", \"pm2_5\", \"pm10\", \"nh3\"]\nREQUIRED_OUTPUT_COLUMNS = [\n    \"city\", \"lat\", \"lon\", \"dt\", \"datetime_utc\", \"aqi\",\n    \"co\", \"no\", \"no2\", \"o3\", \"so2\", \"pm2_5\", \"pm10\", \"nh3\",\n    \"has_missing_pollutant\", \"dt_interpolated\",\n]\n\n\ndef resolve_city(lat, lon):\n    if lat is None or lon is None:\n        return None\n    try:\n        lat_f, lon_f = float(lat), float(lon)\n    except (TypeError, ValueError):\n        return None\n\n    key = (round(lat_f, 4), round(lon_f, 4))\n    if key in CITY_LOOKUP:\n        return CITY_LOOKUP[key]\n\n    key2 = (round(lat_f, 2), round(lon_f, 2))\n    for (k_lat, k_lon), name in CITY_LOOKUP.items():\n        if round(k_lat, 2) == key2[0] and round(k_lon, 2) == key2[1]:\n            return name\n\n    return f\"Inconnue ({lat},{lon})\"\n\n\ndef to_number(x):\n    if x is None:\n        return None\n    try:\n        return float(x)\n    except (TypeError, ValueError):\n        return None\n\n\ndef to_iso(dt):\n    if dt is None:\n        return None\n    try:\n        return datetime.fromtimestamp(float(dt), tz=timezone.utc).isoformat()\n    except (TypeError, ValueError, OSError, OverflowError):\n        return None\n\n\ndef parse_iso(s):\n    if not s or not isinstance(s, str):\n        return None\n    try:\n        return datetime.fromisoformat(s)\n    except ValueError:\n        return None\n\n\ndef interpolate_timestamp(start, end, index, total):\n    if start is None:\n        return None\n    if end is None or total <= 1:\n        return int(start.timestamp())\n    step_seconds = (end - start).total_seconds() / (total - 1)\n    return int((start + timedelta(seconds=step_seconds * index)).timestamp())\n\n\n# ----------------------------------------------------------------------\n# 2. Aplatissement d'un item \"1 ville\" en mesures\n# ----------------------------------------------------------------------\ndef flatten_record(raw):\n    if not isinstance(raw, dict):\n        return []\n\n    coord = raw.get(\"coord\") or {}\n    lat = coord.get(\"lat\", raw.get(\"lat\"))\n    lon = coord.get(\"lon\", raw.get(\"lon\"))\n    measurements = raw.get(\"list\") or raw.get(\"data\") or []\n    city = resolve_city(lat, lon)\n\n    period = raw.get(\"period\") or {}\n    period_start = parse_iso(period.get(\"start\"))\n    period_end = parse_iso(period.get(\"end\"))\n    total = len(measurements)\n\n    rows = []\n    for i, entry in enumerate(measurements):\n        if not isinstance(entry, dict):\n            continue\n        components = entry.get(\"components\") or {}\n\n        dt = entry.get(\"dt\") or entry.get(\"timestamp\") or entry.get(\"time\")\n        dt_interpolated = False\n        if dt is None:\n            dt = interpolate_timestamp(period_start, period_end, i, total)\n            dt_interpolated = dt is not None\n\n        rows.append({\n            \"city\": city,\n            \"lat\": to_number(lat),\n            \"lon\": to_number(lon),\n            \"dt\": dt,\n            \"aqi\": to_number((entry.get(\"main\") or {}).get(\"aqi\")),\n            \"co\": to_number(components.get(\"co\")),\n            \"no\": to_number(components.get(\"no\")),\n            \"no2\": to_number(components.get(\"no2\")),\n            \"o3\": to_number(components.get(\"o3\")),\n            \"so2\": to_number(components.get(\"so2\")),\n            \"pm2_5\": to_number(components.get(\"pm2_5\")),\n            \"pm10\": to_number(components.get(\"pm10\")),\n            \"nh3\": to_number(components.get(\"nh3\")),\n            \"dt_interpolated\": dt_interpolated,\n        })\n    return rows\n\n\ndef is_city_record(d):\n    \"\"\"Objet qui represente UNE ville (a la racine ou dans un tableau agrege).\"\"\"\n    if not isinstance(d, dict):\n        return False\n    return (\"period\" in d) or (\"coord\" in d) or (\"lat\" in d and \"data\" in d) or (\"lat\" in d and \"list\" in d)\n\n\ndef expand_top_level(top):\n    \"\"\"\n    Gere le cas ou un node \"Aggregate\" en amont a regroupe plusieurs villes\n    dans un seul item sous la forme {\"data\": [ville1, ville2, ...]}.\n    Retourne toujours une liste d'objets \"1 ville\" a passer a flatten_record.\n    \"\"\"\n    if not isinstance(top, dict):\n        return []\n\n    data_field = top.get(\"data\")\n    if isinstance(data_field, list) and data_field and is_city_record(data_field[0]):\n        # \"data\" contient des objets ville (cas Aggregate) -> on les deplie\n        return [d for d in data_field if isinstance(d, dict)]\n\n    # Sinon, \"top\" est deja directement un objet ville\n    return [top]\n\n\n# ----------------------------------------------------------------------\n# 3. Nettoyage\n# ----------------------------------------------------------------------\ndef clean_rows(rows):\n    rows = [\n        r for r in rows\n        if r.get(\"aqi\") is not None or any(r.get(c) is not None for c in POLLUTANT_COLUMNS)\n    ]\n\n    rows = [r for r in rows if r.get(\"dt\") is not None]\n    for r in rows:\n        r[\"dt\"] = int(r[\"dt\"])\n        r[\"datetime_utc\"] = to_iso(r[\"dt\"])\n\n    seen = set()\n    deduped = []\n    for r in rows:\n        key = (r.get(\"city\"), r.get(\"dt\"))\n        if key not in seen:\n            seen.add(key)\n            deduped.append(r)\n    rows = deduped\n\n    for r in rows:\n        r[\"has_missing_pollutant\"] = any(r.get(c) is None for c in POLLUTANT_COLUMNS)\n\n    rows.sort(key=lambda r: (r.get(\"city\") or \"\", r.get(\"dt\") or 0))\n\n    return [{col: r.get(col) for col in REQUIRED_OUTPUT_COLUMNS} for r in rows]\n\n\n# ----------------------------------------------------------------------\n# 4. Point d'entree n8n\n# ----------------------------------------------------------------------\ntry:\n    source_items = _items  # ancien runner Pyodide\nexcept NameError:\n    source_items = _input.all()  # runner natif\n\nall_rows = []\nfor item in source_items:\n    top = item[\"json\"] if isinstance(item, dict) else item.json\n    for raw in expand_top_level(top):\n        all_rows.extend(flatten_record(raw))\n\nclean = clean_rows(all_rows)\n\nreturn [{\"json\": row} for row in clean]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        -64
+      ],
+      "id": "336b9cff-85a1-45c0-b1d3-84c0989930fc",
+      "name": "Code in Python"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        -192
+      ],
+      "id": "ff56efbd-5d94-4393-a820-8c179a22b5e7",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "numberInputs": 5
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        944,
+        -272
+      ],
+      "id": "27720bc9-5054-411c-a65e-b2afc5e5e560",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "weather-data-hei",
+        "fileName": "=raw-air-quality-{{ $('Antananarivo Data').item.json.period.start }}.json",
+        "binaryData": false,
+        "fileContent": "=",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        -384
+      ],
+      "id": "ad4c9190-4d69-4d42-9ff5-f6a5f24a1cf8",
+      "name": "Upload RAW",
+      "credentials": {
+        "s3": {
+          "id": "KJH6q0amp8Jwhpqo",
+          "name": "S3 account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "weather-data-hei",
+        "fileName": "=clean-air-quality-{{ $('Antananarivo Data').item.json.period.start }}.csv",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        2176,
+        128
+      ],
+      "id": "55c2b460-fde9-4dbc-87f0-6495668641ba",
+      "name": "Upload CLEAN",
+      "credentials": {
+        "s3": {
+          "id": "KJH6q0amp8Jwhpqo",
+          "name": "S3 account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO fact_air_quality\n    (city_id, time_id, dt, aqi, co, no, no2, o3, so2, pm2_5, pm10, nh3, has_missing_pollutant, dt_interpolated)\nSELECT\n    c.city_id, t.time_id, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14\nFROM dim_city c\nJOIN dim_time t ON t.full_date = ($2::timestamptz)::date\n               AND t.hour = EXTRACT(HOUR FROM $2::timestamptz)::smallint\nWHERE c.city_name = $1\nON CONFLICT (city_id, dt) DO NOTHING;",
+        "options": {
+          "queryReplacement": "={{ $json.city }}\n{{ $json.datetime_utc }}\n{{ $json.dt }}\n{{ $json.aqi }}\n{{ $json.co }}\n{{ $json.no }}\n{{ $json.no2 }}\n{{ $json.o3 }}\n{{ $json.so2 }}\n{{ $json.pm2_5 }}\n{{ $json.pm10 }}\n{{ $json.nh3 }}\n{{ $json.has_missing_pollutant }}\n{{ $json.dt_interpolated }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1952,
+        -144
+      ],
+      "id": "d007ed8c-5661-498d-8519-78b40940f985",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "z9rd1plR5CLgvIG9",
+          "name": "Postgres account 3"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Schedule Trigger": [
+      {
+        "json": {
+          "timestamp": "2026-07-27T18:25:22.298+00:00",
+          "Readable date": "July 27th 2026, 6:25:22 pm",
+          "Readable time": "6:25:22 pm",
+          "Day of week": "Monday",
+          "Year": "2026",
+          "Month": "July",
+          "Day of month": "27",
+          "Hour": "18",
+          "Minute": "25",
+          "Second": "22",
+          "Timezone": "Africa/Antananarivo (UTC+00:00)"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Antananarivo Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tulear Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Toamasina Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mahajanga Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Antsiranana Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Upload CLEAN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tulear Data": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        []
+      ]
+    },
+    "Antananarivo Data": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Toamasina Data": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ],
+        []
+      ]
+    },
+    "Mahajanga Data": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ],
+        []
+      ]
+    },
+    "Antsiranana Data": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 4
+          }
+        ],
+        []
+      ]
+    },
+    "Code in Python": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Upload RAW",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in Python",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload CLEAN": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "dynamic",
+    "timezone": "Indian/Antananarivo",
+    "callerPolicy": "workflowsFromSameOwner",
+    "timeSavedPerExecution": 0
+  },
+  "versionId": "0108a3a9-8aa0-401a-804c-b5a7fc5b5526",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7c68563ff098728ff9147377aba7c75e800d2b86ef2767e72959524ebda31990"
+  },
+  "id": "k-6SLP_LXPE6W1VKc3ZIx",
+  "tags": []
+}
