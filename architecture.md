@@ -29,10 +29,18 @@ dessus (Bloc 2, travail individuel).
 ## Étape 1 — Récupérer les données (n8n)
 
 **Outil : n8n**, installé sur un serveur (VPS) qui tourne en continu.
-
-Toutes les heures, n8n se réveille automatiquement et va chercher les
 données de qualité de l'air pour les 5 villes en même temps, en
 appelant l'API `weather.yotech.mg`.
+
+**À propos de l'API `weather.yotech.mg` :**
+Il s'agit d'une API que nous avons conçue nous-mêmes. Elle fait office de
+passerelle vers l'API publique **OpenWeatherMap**. Concrètement, quand n8n
+interroge `weather.yotech.mg`, notre API relaie la requête vers
+OpenWeatherMap en utilisant une première clé API. Pour éviter d'être bloqués
+en cas de forte utilisation, elle est configurée avec **deux clés API
+OpenWeatherMap** : si la première clé atteint sa limite de requêtes, l'API
+basculera automatiquement sur la seconde clé, afin de garantir la continuité
+de la récupération des données.
 
 **Pourquoi n8n et pas Airflow ?**
 Airflow est plus puissant mais aussi plus lourd à installer et à faire
