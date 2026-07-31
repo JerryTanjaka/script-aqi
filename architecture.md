@@ -2,25 +2,27 @@
 
 ## Le projet en une phrase
 
-On récupère automatiquement, toutes les heures, la qualité de l'air de
+On récupère automatiquement, tous les jours, la qualité de l'air de
 5 villes de Madagascar, on nettoie ces données, et on les stocke pour
 pouvoir ensuite les analyser et les visualiser.
 
 ---
 
-## Le pipeline en 4 étapes
+## Le pipeline en 5 étapes
 
 ```
-1. RÉCUPÉRER            2. STOCKER (brut)        3. NETTOYER            4. CHARGER
-   API météo        -->    AWS S3 - RAW/     -->    Script Python   -->    Data warehouse
-   (n8n, tous les jours)                            CSV propre --> AWS S3 - CLEAN/
+1. RÉCUPÉRER          2. STOCKER (brut)      3. NETTOYER            4. UPLOAD CSV           5. METTRE À JOUR
+   API météo      -->    AWS S3 - RAW/   -->    Script Python   -->    AWS S3 - CLEAN/  -->    Data warehouse
+   (n8n,                                     CSV propre
+    tous les jours)
 ```
 
 Les données sont d'abord récupérées depuis l'API météo et conservées telles
-quelles dans `RAW/`. Un script Python les nettoie ensuite, puis enregistre la
-version propre au format CSV dans `CLEAN/`. Enfin, les données propres mettent
-à jour le **data warehouse** (une base de données organisée), pour que chacun
-puisse construire ses propres graphiques dessus (Bloc 2, travail individuel).
+quelles dans `RAW/`. Un script Python les nettoie ensuite et enregistre la
+version propre au format CSV. Ce CSV propre est uploadé dans `CLEAN/`, puis
+les données de `CLEAN/` mettent à jour le **data warehouse** (une base de
+données organisée), pour que chacun puisse construire ses propres graphiques
+dessus (Bloc 2, travail individuel).
 
 ---
 
@@ -70,9 +72,13 @@ Le script fait le ménage dans les données brutes :
 - il retrouve le nom de la ville à partir de ses coordonnées GPS
 - il range tout ça proprement dans un nouveau fichier CSV
 
-Ce fichier CSV propre est ensuite déposé dans un second dossier, `CLEAN/`
-(= "propre"), toujours sur S3, puis utilisé pour mettre à jour le data
-warehouse.
+Ce fichier CSV propre est ensuite **uploadé** dans un second dossier,
+`CLEAN/` (= "propre"), toujours sur S3.
+
+**Pourquoi une étape d'upload séparée ?**
+Séparer la génération du CSV propre de son dépôt dans `CLEAN/` permet de
+relancer l'envoi vers S3 sans refaire tout le nettoyage, et de garder une
+copie claire des données prêtes à être chargées dans le data warehouse.
 
 **Pourquoi un script à part, plutôt que tout faire dans n8n ?**
 Parce que nettoyer une grosse quantité de données (jusqu'à 12 mois
@@ -87,7 +93,7 @@ adapté à la mise à jour du data warehouse et à l'analyse tabulaire.
 
 ---
 
-## Étape 4 — Mettre à jour le data warehouse
+## Étape 5 — Mettre à jour le data warehouse
 
 Un **data warehouse**, c'est une base de données bien rangée, organisée
 en tables, pensée pour qu'on puisse poser des questions dessus
@@ -120,12 +126,12 @@ tables qui décrivent le contexte (la liste des villes, les dates).
 
 | Étape | Outil |
 |---|---|
-| Récupération des données | n8n (sur VPS) |
+| Récupération des données | n8n (sur VPS, tous les jours) |
 | Source des données | API weather.yotech.mg |
 | Stockage brut | AWS S3 (`RAW/`) |
-| Nettoyage | Python + pandas |
-| Stockage propre | AWS S3 (`CLEAN/`) |
-| Base de données finale | *[à compléter]* |
+| Nettoyage | Python (script `clean_air_quality.py`) |
+| Upload CSV propre | AWS S3 (`CLEAN/`) |
+| Base de données finale | Data warehouse (mise à jour) |
 | Visualisation | Power BI / Tableau / autre |
 
 ---
