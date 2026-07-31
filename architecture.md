@@ -23,16 +23,14 @@ pouvoir ensuite les analyser et les visualiser.
 ```
 1. RÉCUPÉRER            2. STOCKER (brut)        3. NETTOYER            4. CHARGER
    API météo        -->    AWS S3 - RAW/     -->    Script Python   -->    Data warehouse
-   (n8n, toutes                                      (sans pandas)
-    les heures)                         CSV propre --> AWS S3 - CLEAN/
+   (n8n, tous les jours)                            CSV propre --> AWS S3 - CLEAN/
 ```
 
 Les données sont d'abord récupérées depuis l'API météo et conservées telles
-quelles dans `RAW/`. Un script Python les nettoie ensuite sans utiliser
-`pandas`, puis enregistre la version propre au format CSV dans `CLEAN/`.
-Enfin, les données propres sont chargées ou mises à jour dans le **data
-warehouse** (une base de données organisée), pour que chacun puisse
-construire ses propres graphiques dessus (Bloc 2, travail individuel).
+quelles dans `RAW/`. Un script Python les nettoie ensuite, puis enregistre la
+version propre au format CSV dans `CLEAN/`. Enfin, les données propres mettent
+à jour le **data warehouse** (une base de données organisée), pour que chacun
+puisse construire ses propres graphiques dessus (Bloc 2, travail individuel).
 
 ---
 
@@ -70,7 +68,7 @@ Python.
 
 ## Étape 3 — Nettoyer les données (script Python)
 
-**Outil : script Python** (`clean_air_quality.py`, sans pandas), lancé
+**Outil : script Python** (`clean_air_quality.py`), lancé
 automatiquement juste après la récupération, directement depuis n8n (node
 "Execute Command" sur le VPS).
 
@@ -95,7 +93,7 @@ des tâches d'orchestration et des transformations simples.
 **Pourquoi le script sort du CSV ?**
 Le JSON reçu de l'API est conservé tel quel dans `RAW/` afin de garder une
 copie fidèle des données originales. Après nettoyage, le CSV est plus
-adapté au chargement dans le data warehouse et à l'analyse tabulaire.
+adapté à la mise à jour du data warehouse et à l'analyse tabulaire.
 
 ---
 
@@ -108,10 +106,10 @@ facilement (ex : "quelle est la ville la plus polluée en moyenne ?").
 C'est différent du data lake (S3) qui, lui, stocke juste des fichiers
 en vrac.
 
-Les fichiers CSV propres déposés dans `CLEAN/` sont ensuite chargés dans le
-data warehouse. Le chargement met à jour les données existantes et ajoute
-les nouvelles mesures, afin de conserver une table exploitable pour les
-analyses et les visualisations.
+Les fichiers CSV propres déposés dans `CLEAN/` mettent ensuite à jour le
+data warehouse. La mise à jour intègre les nouvelles mesures aux données
+existantes, afin de conserver une table exploitable pour les analyses et
+les visualisations.
 
 Les tables seront organisées en **modélisation en étoile** : une table
 centrale avec les mesures (ville, date, polluants), reliée à des petites
