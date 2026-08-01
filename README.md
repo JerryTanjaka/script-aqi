@@ -23,13 +23,13 @@ Le projet utilise principalement **n8n, AWS S3 et Python** pour automatiser la c
 Les données de qualité de l'air comprennent notamment :
 
 * l'indice de qualité de l'air (AQI) ;
-* le CO ;
-* le NO ;
-* le NO2 ;
-* l'O3 ;
-* le SO2 ;
-* les PM2.5 ;
-* les PM10 ;
-* le NH3.
+* le CO (Monoxyde de carbone);
+* le NO (Monoxyde d'azote);
+* le NO2 (Dioxyde d'azote);
+* l'O3 (Ozone);
+* le SO2 (Dioxyde de souffre);
+* les PM2.5 (Particules fines);
+* les PM10 (Particules en suspension);
+* le NH3 (Ammoniac).
 
 Pour consulter le fonctionnement détaillé du pipeline, les différentes étapes de traitement et les choix techniques, voir [`architecture.md`](architecture.md).
