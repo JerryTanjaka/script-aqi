@@ -151,9 +151,9 @@
         "operation": "upload",
         "bucketName": "weather-data-hei",
         "fileName": "=raw-air-quality-{{ $('Antananarivo Data').item.json.period.start }}.json",
-        "binaryData": false,
-        "fileContent": "=",
-        "additionalFields": {}
+        "additionalFields": {
+          "parentFolderKey": "raw"
+        }
       },
       "type": "n8n-nodes-base.s3",
       "typeVersion": 1,
@@ -175,7 +175,9 @@
         "operation": "upload",
         "bucketName": "weather-data-hei",
         "fileName": "=clean-air-quality-{{ $('Antananarivo Data').item.json.period.start }}.csv",
-        "additionalFields": {}
+        "additionalFields": {
+          "parentFolderKey": "clean"
+        }
       },
       "type": "n8n-nodes-base.s3",
       "typeVersion": 1,
@@ -214,6 +216,20 @@
           "name": "Postgres account 3"
         }
       }
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        -272
+      ],
+      "id": "9c018360-9677-41a3-87fa-eb070246165c",
+      "name": "Convert to File1"
     }
   ],
   "pinData": {
@@ -361,12 +377,12 @@
       "main": [
         [
           {
-            "node": "Upload RAW",
+            "node": "Code in Python",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Code in Python",
+            "node": "Convert to File1",
             "type": "main",
             "index": 0
           }
@@ -388,6 +404,17 @@
       "main": [
         []
       ]
+    },
+    "Convert to File1": {
+      "main": [
+        [
+          {
+            "node": "Upload RAW",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -399,7 +426,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "timeSavedPerExecution": 0
   },
-  "versionId": "0108a3a9-8aa0-401a-804c-b5a7fc5b5526",
+  "versionId": "39fed6e9-9ff5-43ed-974c-a8ffe7ab2dd0",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7c68563ff098728ff9147377aba7c75e800d2b86ef2767e72959524ebda31990"
